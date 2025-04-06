@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { fetch } from "undici";
 import { kv } from "@vercel/kv";
-
+export const runtime = "nodejs";
 // Define types for better type safety
 type GitHubContent = {
   name: string;
@@ -69,10 +69,6 @@ const getFromKVOrGitHub = async (
   return data;
 };
 
-// Node.js runtime
-export const config = {
-  runtime: "nodejs",
-};
 
 const app = new Hono().basePath("/api");
 
@@ -167,8 +163,3 @@ app.get("/lessons/:language/:quarter/:lesson/:day", async (c) => {
 export const GET = handle(app);
 export const POST = handle(app);
 export const PUT = handle(app);
-export const DELETE = handle(app);
-export const PATCH = handle(app);
-export const OPTIONS = handle(app);
-export const HEAD = handle(app);
-export const ALL = handle(app);
