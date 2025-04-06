@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { handle } from "hono/vercel";
 import { fetch } from "undici";
-import { kv } from "@vercel/kv";
 export const runtime = "nodejs";
+
 // Define types for better type safety
 type GitHubContent = {
   name: string;
@@ -26,23 +26,13 @@ const GITHUB_API_URL =
   "https://api.github.com/repos/Adventech/sabbath-school-lessons/contents/src";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 
-// Helper function to check KV or fetch from GitHub
-const getFromKVOrGitHub = async (
+// Helper function to fetch directly from GitHub
+const getFromGitHub = async (
   path: string
 ): Promise<GitHubContent | GitHubContent[]> => {
   const cleanPath = path.startsWith("/") ? path : `/${path}`;
-  const cacheKey = `github:${cleanPath}`;
-
-  // Try to get from Vercel KV
-  const cached = await kv.get<GitHubContent | GitHubContent[]>(cacheKey);
-  if (cached) {
-    console.log(`Serving from cache: ${cacheKey}`);
-    return cached;
-  }
-
-  // Fetch fresh from GitHub
-  console.log(`Fetching from GitHub: ${cleanPath}`);
   const url = `${GITHUB_API_URL}${cleanPath}`;
+
   const response = await fetch(url, {
     headers: {
       Authorization: `token ${GITHUB_TOKEN}`,
@@ -63,16 +53,12 @@ const getFromKVOrGitHub = async (
     throw new Error("Empty response data from GitHub");
   }
 
-  // Cache for 1 hour (3600 seconds)
-  await kv.set(cacheKey, data, { ex: 3600 });
-
   return data;
 };
 
-
 const app = new Hono().basePath("/api");
 
-app.get("/test", (c) => c.text("Hello Node.js + KV!"));
+app.get("/test", (c) => c.text("Hello Node.js!"));
 
 app.get("/lessons/:language", async (c) => {
   try {
@@ -80,7 +66,7 @@ app.get("/lessons/:language", async (c) => {
     if (!language) {
       return c.json({ message: "Language parameter is required" }, 400);
     }
-    const data = await getFromKVOrGitHub(`${language}`);
+    const data = await getFromGitHub(`${language}`);
     return c.json(data);
   } catch (error) {
     console.error("Error in /lessons/:language:", error);
@@ -101,7 +87,7 @@ app.get("/lessons/:language/:quarter", async (c) => {
         400
       );
     }
-    const data = await getFromKVOrGitHub(`${language}/${quarter}`);
+    const data = await getFromGitHub(`${language}/${quarter}`);
     return c.json(data);
   } catch (error) {
     console.error("Error in /lessons/:language/:quarter:", error);
@@ -125,7 +111,7 @@ app.get("/lessons/:language/:quarter/:lesson", async (c) => {
       );
     }
 
-    const data = await getFromKVOrGitHub(`${language}/${quarter}/${lesson}`);
+    const data = await getFromGitHub(`${language}/${quarter}/${lesson}`);
     return c.json(data);
   } catch (error) {
     console.error("Error in /lessons/:language/:quarter/:lesson:", error);
@@ -147,9 +133,7 @@ app.get("/lessons/:language/:quarter/:lesson/:day", async (c) => {
       return c.json({ message: "All parameters are required" }, 400);
     }
 
-    const data = await getFromKVOrGitHub(
-      `${language}/${quarter}/${lesson}/${day}`
-    );
+    const data = await getFromGitHub(`${language}/${quarter}/${lesson}/${day}`);
     return c.json(data);
   } catch (error) {
     console.error("Error in /lessons/:language/:quarter/:lesson/:day:", error);
